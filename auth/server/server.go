@@ -39,10 +39,10 @@ type googleUserInfoResponse struct {
 }
 
 func handleSignIn(state string, config *oauth2.Config) gin.HandlerFunc {
-	url := config.AuthCodeURL(state)
+	redirectUrl := config.AuthCodeURL(state)
 
 	return func(c *gin.Context) {
-		c.Redirect(http.StatusTemporaryRedirect, url)
+		c.Redirect(http.StatusTemporaryRedirect, redirectUrl)
 	}
 }
 
@@ -50,33 +50,6 @@ func handleSignOut() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.SetCookie(viper.GetString("auth.cookieName"), "", 0, "/", "", false, true)
 		c.Redirect(http.StatusTemporaryRedirect, "/")
-	}
-}
-
-func handleStatus(store *auth.Store) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		tokenString, err := c.Cookie(viper.GetString("auth.cookieName"))
-		if err != nil || len(tokenString) == 0 {
-			c.Status(http.StatusUnauthorized)
-			return
-		}
-
-		token, err := jwt.ParseWithClaims(tokenString, &claims{}, func(token *jwt.Token) (interface{}, error) {
-			return []byte(viper.GetString("auth.signingKey")), nil
-		})
-
-		if claims, ok := token.Claims.(*claims); ok && token.Valid {
-			exists, err := store.UserExists(claims.UserID)
-			if err != nil {
-				c.Status(http.StatusInternalServerError)
-			} else if !exists {
-				c.Status(http.StatusUnauthorized)
-			} else {
-				c.Status(http.StatusOK)
-			}
-		} else {
-			c.Status(http.StatusUnauthorized)
-		}
 	}
 }
 
@@ -180,11 +153,11 @@ func main() {
 	}
 
 	r := gin.Default()
+	g := r.Group("/auth")
 
-	r.GET("/sign-in", handleSignIn(state, config))
-	r.GET("/sign-out", handleSignOut())
-	r.GET("/status", handleStatus(store))
-	r.GET("/auth", handleAuth(state, store, config))
+	g.GET("/sign-in", handleSignIn(state, config))
+	g.GET("/sign-out", handleSignOut())
+	g.GET("/", handleAuth(state, store, config))
 
 	_ = r.Run(viper.GetString("auth.serverAddress"))
 }

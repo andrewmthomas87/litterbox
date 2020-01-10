@@ -13,21 +13,18 @@ type Resolver struct {
 	Db *sqlx.DB
 }
 
-func (r *Resolver) Mutation() MutationResolver {
-	return &mutationResolver{r}
-}
 func (r *Resolver) Query() QueryResolver {
 	return &queryResolver{r}
 }
 
-type mutationResolver struct{ *Resolver }
-
-func (r *mutationResolver) CreateTodo(ctx context.Context, input models.NewTodo) (*models.Todo, error) {
-	panic("not implemented")
-}
-
 type queryResolver struct{ *Resolver }
 
-func (r *queryResolver) Todos(ctx context.Context) ([]*models.Todo, error) {
-	panic("not implemented")
+func (r *queryResolver) Me(ctx context.Context) (*models.Me, error) {
+	userID := ctx.Value("user_id").(string)
+	me := models.Me{}
+	if err := r.Db.Get(&me, "SELECT email, name FROM users WHERE id=?", userID); err != nil {
+		return nil, err
+	}
+
+	return &me, nil
 }

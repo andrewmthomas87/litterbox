@@ -62,7 +62,7 @@ func handleGraphQLQuery(db *sqlx.DB) gin.HandlerFunc {
 }
 
 func handlePlayground() gin.HandlerFunc {
-	h := handler.Playground("GraphQL", "/query")
+	h := handler.Playground("GraphQL", "http://localhost:8080/graphql/query")
 
 	return func(c *gin.Context) {
 		h.ServeHTTP(c.Writer, c.Request)
@@ -94,8 +94,9 @@ func main() {
 	store := auth.NewStore(db, pool)
 
 	r := gin.Default()
+	g := r.Group("/graphql")
 	if viper.GetBool("dev") {
-		r.Use(cors.New(cors.Config{
+		g.Use(cors.New(cors.Config{
 			AllowOrigins:     []string{"*"},
 			AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"},
 			AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type"},
@@ -104,12 +105,12 @@ func main() {
 		}))
 	}
 
-	authorized := r.Group("/")
+	authorized := g.Group("/")
 	authorized.Use(handleAuth(store))
 
 	authorized.POST("/query", handleGraphQLQuery(db))
 	if viper.GetBool("dev") {
-		authorized.GET("/", handlePlayground())
+		authorized.GET("/playground", handlePlayground())
 	}
 
 	_ = r.Run(viper.GetString("api.serverAddress"))
