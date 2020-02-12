@@ -1,8 +1,18 @@
 type Me {
     email: String!
     name: String!
+    stage: Int!
+}
+
+input InformationInput {
+    name: String!
+    onCampus: Boolean!
+    building: String!
+    address: String!
+    onCampusFuture: Boolean!
 }
 
 type Query {
     me: Me!
+    saveInformation(information: InformationInput!): Me!
 }

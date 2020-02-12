@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"github.com/andrewmthomas87/litterbox/graphql/models"
 	"github.com/jmoiron/sqlx"
 	"github.com/mediocregopher/radix/v3"
 )
@@ -37,7 +38,7 @@ func (s *Store) SetUser(ctx context.Context, id, email, name, accessToken, refre
 			return err
 		}
 	} else {
-		_, err := tx.ExecContext(ctx, "INSERT INTO users (id, email, name) VALUES (?, ?, ?)", id, email, name)
+		_, err := tx.ExecContext(ctx, "INSERT INTO users (id, email, name, stage) VALUES (?, ?, ?, ?)", id, email, name, models.StageInformation)
 		if err != nil {
 			_ = tx.Rollback()
 

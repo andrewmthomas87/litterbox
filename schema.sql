@@ -4,9 +4,15 @@ USE litterbox;
 
 CREATE TABLE users
 (
-    id    VARCHAR(250),
-    email VARCHAR(1000),
-    name  VARCHAR(1000),
+    id             VARCHAR(250),
+    email          VARCHAR(1000),
+    name           VARCHAR(1000),
+    stage          TINYINT,
+
+    onCampus       BOOLEAN,
+    building       TINYINT,
+    address        VARCHAR(500),
+    onCampusFuture BOOLEAN,
 
     PRIMARY KEY (id)
 );
