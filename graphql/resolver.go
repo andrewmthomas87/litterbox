@@ -59,3 +59,12 @@ func (r *queryResolver) SaveInformation(ctx context.Context, information models.
 
 	return &me, nil
 }
+
+func (r *queryResolver) PickupTimeSlots(ctx context.Context) ([]*models.TimeSlot, error) {
+	var timeSlots []*models.TimeSlot
+	if err := r.Db.Select(&timeSlots, "SELECT id, date, startTime, endTime FROM pickupTimeSlots ORDER BY date ASC, startTime ASC, endTime ASC"); err != nil {
+		return nil, err
+	}
+
+	return timeSlots, nil
+}

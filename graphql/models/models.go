@@ -72,3 +72,16 @@ type InformationErrors struct {
 	Building string `json:"building"`
 	Address  string `json:"address"`
 }
+
+type Me struct {
+	Email string `json:"email"`
+	Name  string `json:"name"`
+	Stage int    `json:"stage"`
+}
+
+type TimeSlot struct {
+	ID        int    `json:"id"`
+	Date      string `json:"date"`
+	StartTime string `json:"startTime" db:"startTime"`
+	EndTime   string `json:"endTime" db:"endTime"`
+}

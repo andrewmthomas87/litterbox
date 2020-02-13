@@ -16,3 +16,13 @@ CREATE TABLE users
 
     PRIMARY KEY (id)
 );
+
+CREATE TABLE pickupTimeSlots
+(
+    id        INT AUTO_INCREMENT,
+    date      DATE,
+    startTime TIME,
+    endTime   TIME,
+
+    PRIMARY KEY (id)
+);

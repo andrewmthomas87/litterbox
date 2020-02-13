@@ -12,7 +12,15 @@ input InformationInput {
     onCampusFuture: Boolean!
 }
 
+type TimeSlot {
+    id: Int!
+    date: String!
+    startTime: String!
+    endTime: String!
+}
+
 type Query {
     me: Me!
     saveInformation(information: InformationInput!): Me!
+    pickupTimeSlots: [TimeSlot!]!
 }

@@ -9,9 +9,3 @@ type InformationInput struct {
 	Address        string `json:"address"`
 	OnCampusFuture bool   `json:"onCampusFuture"`
 }
-
-type Me struct {
-	Email string `json:"email"`
-	Name  string `json:"name"`
-	Stage int    `json:"stage"`
-}
