@@ -62,7 +62,7 @@ func (r *queryResolver) SaveInformation(ctx context.Context, information models.
 
 func (r *queryResolver) PickupTimeSlots(ctx context.Context) ([]*models.TimeSlot, error) {
 	var timeSlots []*models.TimeSlot
-	if err := r.Db.Select(&timeSlots, "SELECT id, date, startTime, endTime FROM pickupTimeSlots ORDER BY date ASC, startTime ASC, endTime ASC"); err != nil {
+	if err := r.Db.Select(&timeSlots, "SELECT id, date, DATE_FORMAT(startTime, '%H:%i') AS startTime, DATE_FORMAT(endTime, '%H:%i') AS endTime FROM pickupTimeSlots ORDER BY date ASC, startTime ASC, endTime ASC"); err != nil {
 		return nil, err
 	}
 
