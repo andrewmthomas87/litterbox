@@ -35,6 +35,7 @@ type Config struct {
 }
 
 type ResolverRoot interface {
+	Mutation() MutationResolver
 	Query() QueryResolver
 }
 
@@ -48,13 +49,20 @@ type ComplexityRoot struct {
 		Stage func(childComplexity int) int
 	}
 
+	Mutation struct {
+		SaveInformation      func(childComplexity int, information models.InformationInput) int
+		SelectPickupTimeSlot func(childComplexity int, id int) int
+	}
+
 	Query struct {
-		Me              func(childComplexity int) int
-		PickupTimeSlots func(childComplexity int) int
-		SaveInformation func(childComplexity int, information models.InformationInput) int
+		Me               func(childComplexity int) int
+		MyPickupTimeSlot func(childComplexity int) int
+		PickupTimeSlots  func(childComplexity int) int
 	}
 
 	TimeSlot struct {
+		Capacity  func(childComplexity int) int
+		Count     func(childComplexity int) int
 		Date      func(childComplexity int) int
 		EndTime   func(childComplexity int) int
 		ID        func(childComplexity int) int
@@ -62,10 +70,14 @@ type ComplexityRoot struct {
 	}
 }
 
+type MutationResolver interface {
+	SaveInformation(ctx context.Context, information models.InformationInput) (*models.Me, error)
+	SelectPickupTimeSlot(ctx context.Context, id int) (*models.TimeSlot, error)
+}
 type QueryResolver interface {
 	Me(ctx context.Context) (*models.Me, error)
-	SaveInformation(ctx context.Context, information models.InformationInput) (*models.Me, error)
 	PickupTimeSlots(ctx context.Context) ([]*models.TimeSlot, error)
+	MyPickupTimeSlot(ctx context.Context) (*models.TimeSlot, error)
 }
 
 type executableSchema struct {
@@ -104,12 +116,43 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Me.Stage(childComplexity), true
 
+	case "Mutation.saveInformation":
+		if e.complexity.Mutation.SaveInformation == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_saveInformation_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.SaveInformation(childComplexity, args["information"].(models.InformationInput)), true
+
+	case "Mutation.selectPickupTimeSlot":
+		if e.complexity.Mutation.SelectPickupTimeSlot == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_selectPickupTimeSlot_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.SelectPickupTimeSlot(childComplexity, args["id"].(int)), true
+
 	case "Query.me":
 		if e.complexity.Query.Me == nil {
 			break
 		}
 
 		return e.complexity.Query.Me(childComplexity), true
+
+	case "Query.myPickupTimeSlot":
+		if e.complexity.Query.MyPickupTimeSlot == nil {
+			break
+		}
+
+		return e.complexity.Query.MyPickupTimeSlot(childComplexity), true
 
 	case "Query.pickupTimeSlots":
 		if e.complexity.Query.PickupTimeSlots == nil {
@@ -118,17 +161,19 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.PickupTimeSlots(childComplexity), true
 
-	case "Query.saveInformation":
-		if e.complexity.Query.SaveInformation == nil {
+	case "TimeSlot.capacity":
+		if e.complexity.TimeSlot.Capacity == nil {
 			break
 		}
 
-		args, err := ec.field_Query_saveInformation_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
+		return e.complexity.TimeSlot.Capacity(childComplexity), true
+
+	case "TimeSlot.count":
+		if e.complexity.TimeSlot.Count == nil {
+			break
 		}
 
-		return e.complexity.Query.SaveInformation(childComplexity, args["information"].(models.InformationInput)), true
+		return e.complexity.TimeSlot.Count(childComplexity), true
 
 	case "TimeSlot.date":
 		if e.complexity.TimeSlot.Date == nil {
@@ -180,7 +225,20 @@ func (e *executableSchema) Query(ctx context.Context, op *ast.OperationDefinitio
 }
 
 func (e *executableSchema) Mutation(ctx context.Context, op *ast.OperationDefinition) *graphql.Response {
-	return graphql.ErrorResponse(ctx, "mutations are not supported")
+	ec := executionContext{graphql.GetRequestContext(ctx), e}
+
+	buf := ec.RequestMiddleware(ctx, func(ctx context.Context) []byte {
+		data := ec._Mutation(ctx, op.SelectionSet)
+		var buf bytes.Buffer
+		data.MarshalGQL(&buf)
+		return buf.Bytes()
+	})
+
+	return &graphql.Response{
+		Data:       buf,
+		Errors:     ec.Errors,
+		Extensions: ec.Extensions,
+	}
 }
 
 func (e *executableSchema) Subscription(ctx context.Context, op *ast.OperationDefinition) func() *graphql.Response {
@@ -226,12 +284,19 @@ type TimeSlot {
     date: String!
     startTime: String!
     endTime: String!
+    capacity: Int!
+    count: Int!
 }
 
 type Query {
     me: Me!
-    saveInformation(information: InformationInput!): Me!
     pickupTimeSlots: [TimeSlot!]!
+    myPickupTimeSlot: TimeSlot
+}
+
+type Mutation {
+    saveInformation(information: InformationInput!): Me!
+    selectPickupTimeSlot(id: Int!): TimeSlot
 }
 `},
 )
@@ -239,6 +304,34 @@ type Query {
 // endregion ************************** generated!.gotpl **************************
 
 // region    ***************************** args.gotpl *****************************
+
+func (ec *executionContext) field_Mutation_saveInformation_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 models.InformationInput
+	if tmp, ok := rawArgs["information"]; ok {
+		arg0, err = ec.unmarshalNInformationInput2githubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐInformationInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["information"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_selectPickupTimeSlot_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 int
+	if tmp, ok := rawArgs["id"]; ok {
+		arg0, err = ec.unmarshalNInt2int(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["id"] = arg0
+	return args, nil
+}
 
 func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
@@ -251,20 +344,6 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 		}
 	}
 	args["name"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Query_saveInformation_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 models.InformationInput
-	if tmp, ok := rawArgs["information"]; ok {
-		arg0, err = ec.unmarshalNInformationInput2githubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐInformationInput(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["information"] = arg0
 	return args, nil
 }
 
@@ -415,6 +494,91 @@ func (ec *executionContext) _Me_stage(ctx context.Context, field graphql.Collect
 	return ec.marshalNInt2int(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Mutation_saveInformation(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	ctx = ec.Tracer.StartFieldExecution(ctx, field)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+		ec.Tracer.EndFieldExecution(ctx)
+	}()
+	rctx := &graphql.ResolverContext{
+		Object:   "Mutation",
+		Field:    field,
+		Args:     nil,
+		IsMethod: true,
+	}
+	ctx = graphql.WithResolverContext(ctx, rctx)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_saveInformation_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	rctx.Args = args
+	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().SaveInformation(rctx, args["information"].(models.InformationInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !ec.HasError(rctx) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*models.Me)
+	rctx.Result = res
+	ctx = ec.Tracer.StartFieldChildExecution(ctx)
+	return ec.marshalNMe2ᚖgithubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐMe(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_selectPickupTimeSlot(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	ctx = ec.Tracer.StartFieldExecution(ctx, field)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+		ec.Tracer.EndFieldExecution(ctx)
+	}()
+	rctx := &graphql.ResolverContext{
+		Object:   "Mutation",
+		Field:    field,
+		Args:     nil,
+		IsMethod: true,
+	}
+	ctx = graphql.WithResolverContext(ctx, rctx)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_selectPickupTimeSlot_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	rctx.Args = args
+	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().SelectPickupTimeSlot(rctx, args["id"].(int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*models.TimeSlot)
+	rctx.Result = res
+	ctx = ec.Tracer.StartFieldChildExecution(ctx)
+	return ec.marshalOTimeSlot2ᚖgithubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐTimeSlot(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Query_me(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	ctx = ec.Tracer.StartFieldExecution(ctx, field)
 	defer func() {
@@ -435,50 +599,6 @@ func (ec *executionContext) _Query_me(ctx context.Context, field graphql.Collect
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
 		return ec.resolvers.Query().Me(rctx)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !ec.HasError(rctx) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(*models.Me)
-	rctx.Result = res
-	ctx = ec.Tracer.StartFieldChildExecution(ctx)
-	return ec.marshalNMe2ᚖgithubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐMe(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Query_saveInformation(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	ctx = ec.Tracer.StartFieldExecution(ctx, field)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-		ec.Tracer.EndFieldExecution(ctx)
-	}()
-	rctx := &graphql.ResolverContext{
-		Object:   "Query",
-		Field:    field,
-		Args:     nil,
-		IsMethod: true,
-	}
-	ctx = graphql.WithResolverContext(ctx, rctx)
-	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Query_saveInformation_args(ctx, rawArgs)
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	rctx.Args = args
-	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().SaveInformation(rctx, args["information"].(models.InformationInput))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -531,6 +651,40 @@ func (ec *executionContext) _Query_pickupTimeSlots(ctx context.Context, field gr
 	rctx.Result = res
 	ctx = ec.Tracer.StartFieldChildExecution(ctx)
 	return ec.marshalNTimeSlot2ᚕᚖgithubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐTimeSlotᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Query_myPickupTimeSlot(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	ctx = ec.Tracer.StartFieldExecution(ctx, field)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+		ec.Tracer.EndFieldExecution(ctx)
+	}()
+	rctx := &graphql.ResolverContext{
+		Object:   "Query",
+		Field:    field,
+		Args:     nil,
+		IsMethod: true,
+	}
+	ctx = graphql.WithResolverContext(ctx, rctx)
+	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().MyPickupTimeSlot(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*models.TimeSlot)
+	rctx.Result = res
+	ctx = ec.Tracer.StartFieldChildExecution(ctx)
+	return ec.marshalOTimeSlot2ᚖgithubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐTimeSlot(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -754,6 +908,80 @@ func (ec *executionContext) _TimeSlot_endTime(ctx context.Context, field graphql
 	rctx.Result = res
 	ctx = ec.Tracer.StartFieldChildExecution(ctx)
 	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _TimeSlot_capacity(ctx context.Context, field graphql.CollectedField, obj *models.TimeSlot) (ret graphql.Marshaler) {
+	ctx = ec.Tracer.StartFieldExecution(ctx, field)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+		ec.Tracer.EndFieldExecution(ctx)
+	}()
+	rctx := &graphql.ResolverContext{
+		Object:   "TimeSlot",
+		Field:    field,
+		Args:     nil,
+		IsMethod: false,
+	}
+	ctx = graphql.WithResolverContext(ctx, rctx)
+	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Capacity, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !ec.HasError(rctx) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	rctx.Result = res
+	ctx = ec.Tracer.StartFieldChildExecution(ctx)
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _TimeSlot_count(ctx context.Context, field graphql.CollectedField, obj *models.TimeSlot) (ret graphql.Marshaler) {
+	ctx = ec.Tracer.StartFieldExecution(ctx, field)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+		ec.Tracer.EndFieldExecution(ctx)
+	}()
+	rctx := &graphql.ResolverContext{
+		Object:   "TimeSlot",
+		Field:    field,
+		Args:     nil,
+		IsMethod: false,
+	}
+	ctx = graphql.WithResolverContext(ctx, rctx)
+	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Count, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !ec.HasError(rctx) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	rctx.Result = res
+	ctx = ec.Tracer.StartFieldChildExecution(ctx)
+	return ec.marshalNInt2int(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) ___Directive_name(ctx context.Context, field graphql.CollectedField, obj *introspection.Directive) (ret graphql.Marshaler) {
@@ -1994,6 +2222,39 @@ func (ec *executionContext) _Me(ctx context.Context, sel ast.SelectionSet, obj *
 	return out
 }
 
+var mutationImplementors = []string{"Mutation"}
+
+func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.RequestContext, sel, mutationImplementors)
+
+	ctx = graphql.WithResolverContext(ctx, &graphql.ResolverContext{
+		Object: "Mutation",
+	})
+
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Mutation")
+		case "saveInformation":
+			out.Values[i] = ec._Mutation_saveInformation(ctx, field)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "selectPickupTimeSlot":
+			out.Values[i] = ec._Mutation_selectPickupTimeSlot(ctx, field)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var queryImplementors = []string{"Query"}
 
 func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -2023,20 +2284,6 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				}
 				return res
 			})
-		case "saveInformation":
-			field := field
-			out.Concurrently(i, func() (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_saveInformation(ctx, field)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
-				return res
-			})
 		case "pickupTimeSlots":
 			field := field
 			out.Concurrently(i, func() (res graphql.Marshaler) {
@@ -2049,6 +2296,17 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				if res == graphql.Null {
 					atomic.AddUint32(&invalids, 1)
 				}
+				return res
+			})
+		case "myPickupTimeSlot":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_myPickupTimeSlot(ctx, field)
 				return res
 			})
 		case "__type":
@@ -2094,6 +2352,16 @@ func (ec *executionContext) _TimeSlot(ctx context.Context, sel ast.SelectionSet,
 			}
 		case "endTime":
 			out.Values[i] = ec._TimeSlot_endTime(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "capacity":
+			out.Values[i] = ec._TimeSlot_capacity(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "count":
+			out.Values[i] = ec._TimeSlot_count(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
@@ -2734,6 +3002,17 @@ func (ec *executionContext) marshalOString2ᚖstring(ctx context.Context, sel as
 		return graphql.Null
 	}
 	return ec.marshalOString2string(ctx, sel, *v)
+}
+
+func (ec *executionContext) marshalOTimeSlot2githubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐTimeSlot(ctx context.Context, sel ast.SelectionSet, v models.TimeSlot) graphql.Marshaler {
+	return ec._TimeSlot(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalOTimeSlot2ᚖgithubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐTimeSlot(ctx context.Context, sel ast.SelectionSet, v *models.TimeSlot) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._TimeSlot(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalO__EnumValue2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐEnumValueᚄ(ctx context.Context, sel ast.SelectionSet, v []introspection.EnumValue) graphql.Marshaler {

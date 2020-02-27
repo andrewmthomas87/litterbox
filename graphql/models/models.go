@@ -84,4 +84,6 @@ type TimeSlot struct {
 	Date      string `json:"date"`
 	StartTime string `json:"startTime" db:"startTime"`
 	EndTime   string `json:"endTime" db:"endTime"`
+	Capacity  int    `json:"capacity"`
+	Count     int    `json:"count"`
 }

@@ -23,6 +23,14 @@ CREATE TABLE pickupTimeSlots
     date      DATE,
     startTime TIME,
     endTime   TIME,
+    capacity  int,
+    count     int,
 
     PRIMARY KEY (id)
+);
+
+CREATE TABLE pickupTimeSlotSelections
+(
+    userID     VARCHAR(250),
+    timeSlotID INT
 );

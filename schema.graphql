@@ -17,10 +17,17 @@ type TimeSlot {
     date: String!
     startTime: String!
     endTime: String!
+    capacity: Int!
+    count: Int!
 }
 
 type Query {
     me: Me!
-    saveInformation(information: InformationInput!): Me!
     pickupTimeSlots: [TimeSlot!]!
+    myPickupTimeSlot: TimeSlot
+}
+
+type Mutation {
+    saveInformation(information: InformationInput!): Me!
+    selectPickupTimeSlot(id: Int!): TimeSlot
 }
