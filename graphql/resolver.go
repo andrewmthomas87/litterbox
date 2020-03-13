@@ -5,6 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/jmoiron/sqlx"
+	"github.com/spf13/viper"
+	"github.com/stripe/stripe-go"
+	"github.com/stripe/stripe-go/checkout/session"
 
 	"github.com/andrewmthomas87/litterbox/graphql/models"
 )
@@ -35,6 +38,26 @@ func (r *queryResolver) Me(ctx context.Context) (*models.Me, error) {
 	}
 
 	return &me, nil
+}
+
+func (r *queryResolver) StorageItems(ctx context.Context) ([]*models.StorageItem, error) {
+	var storageItems []*models.StorageItem
+	if err := r.Db.SelectContext(ctx, &storageItems, "SELECT id, name, price, description FROM storageItems ORDER BY name ASC"); err != nil {
+		return nil, err
+	}
+
+	return storageItems, nil
+}
+
+func (r *queryResolver) MyStorageItemQuantities(ctx context.Context) ([]*models.StorageItemQuantity, error) {
+	userID := ctx.Value("user_id").(string)
+
+	var storageItemQuantities []*models.StorageItemQuantity
+	if err := r.Db.SelectContext(ctx, &storageItemQuantities, "SELECT itemID, quantity FROM storageItemQuantities WHERE userID=?", userID); err != nil {
+		return nil, err
+	}
+
+	return storageItemQuantities, nil
 }
 
 func (r *queryResolver) PickupTimeSlots(ctx context.Context) ([]*models.TimeSlot, error) {
@@ -93,6 +116,65 @@ func (r *mutationResolver) SaveInformation(ctx context.Context, information mode
 	}
 
 	return &me, nil
+}
+
+func (r *mutationResolver) GenerateReservationSession(ctx context.Context) (string, error) {
+	params := &stripe.CheckoutSessionParams{
+		PaymentMethodTypes: stripe.StringSlice([]string{
+			"card",
+		}),
+		LineItems: []*stripe.CheckoutSessionLineItemParams{
+			&stripe.CheckoutSessionLineItemParams{
+				Name:        stripe.String("Reservation fee"),
+				Description: stripe.String("TODO"),
+				Amount:      stripe.Int64(2500),
+				Currency:    stripe.String(string(stripe.CurrencyUSD)),
+				Quantity:    stripe.Int64(1),
+			},
+		},
+		SuccessURL: stripe.String(viper.GetString("stripe.successURL")),
+		CancelURL:  stripe.String(viper.GetString("stripe.cancelURL")),
+	}
+
+	session, err := session.New(params)
+	if err != nil {
+		return "", err
+	}
+
+	return session.ID, nil
+}
+
+func (r *mutationResolver) SetStorageItemQuantities(ctx context.Context, quantities models.StorageItemQuantitiesInput) ([]*models.StorageItemQuantity, error) {
+	userID := ctx.Value("user_id").(string)
+
+	tx, err := r.Db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := tx.ExecContext(ctx, "DELETE FROM storageItemQuantities WHERE userID=?", userID); err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+
+	for _, quantity := range quantities.Quantities {
+		if _, err := tx.ExecContext(ctx, "INSERT INTO storageItemQuantities (userID, itemID, quantity) VALUES (?, ?, ?)", userID, quantity.ItemID, quantity.Quantity); err != nil {
+			_ = tx.Rollback()
+			return nil, err
+		}
+	}
+
+	var storageItemQuantities []*models.StorageItemQuantity
+	if err := tx.SelectContext(ctx, &storageItemQuantities, "SELECT itemID, quantity FROM storageItemQuantities WHERE userID=?", userID); err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return storageItemQuantities, nil
 }
 
 func (r *mutationResolver) SelectPickupTimeSlot(ctx context.Context, id int) (*models.TimeSlot, error) {

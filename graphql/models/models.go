@@ -79,6 +79,18 @@ type Me struct {
 	Stage int    `json:"stage"`
 }
 
+type StorageItem struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Price       int    `json:"price"`
+	Description string `json:"description"`
+}
+
+type StorageItemQuantity struct {
+	ItemID   int `json:"itemID" db:"itemID"`
+	Quantity int `json:"quantity"`
+}
+
 type TimeSlot struct {
 	ID        int    `json:"id"`
 	Date      string `json:"date"`

@@ -9,3 +9,12 @@ type InformationInput struct {
 	Address        string `json:"address"`
 	OnCampusFuture bool   `json:"onCampusFuture"`
 }
+
+type StorageItemQuantitiesInput struct {
+	Quantities []*StorageItemQuantityInput `json:"quantities"`
+}
+
+type StorageItemQuantityInput struct {
+	ItemID   int `json:"itemID"`
+	Quantity int `json:"quantity"`
+}

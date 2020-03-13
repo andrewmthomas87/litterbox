@@ -11,6 +11,7 @@ require (
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/mediocregopher/radix/v3 v3.4.2
 	github.com/spf13/viper v1.6.1
+	github.com/stripe/stripe-go v70.4.0+incompatible
 	github.com/vektah/gqlparser v1.2.0
 	golang.org/x/oauth2 v0.0.0-20180821212333-d2e6202438be
 )

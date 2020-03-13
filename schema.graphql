@@ -12,6 +12,27 @@ input InformationInput {
     onCampusFuture: Boolean!
 }
 
+input StorageItemQuantityInput {
+    itemID: Int!
+    quantity: Int!
+}
+
+input StorageItemQuantitiesInput {
+    quantities: [StorageItemQuantityInput!]!
+}
+
+type StorageItem {
+    id: Int!
+    name: String!
+    price: Int!
+    description: String!
+}
+
+type StorageItemQuantity {
+    itemID: Int!
+    quantity: Int!
+}
+
 type TimeSlot {
     id: Int!
     date: String!
@@ -23,11 +44,15 @@ type TimeSlot {
 
 type Query {
     me: Me!
+    storageItems: [StorageItem!]!
+    myStorageItemQuantities: [StorageItemQuantity!]!
     pickupTimeSlots: [TimeSlot!]!
     myPickupTimeSlot: TimeSlot
 }
 
 type Mutation {
     saveInformation(information: InformationInput!): Me!
+    generateReservationSession: String!
+    setStorageItemQuantities(quantities: StorageItemQuantitiesInput!): [StorageItemQuantity!]!
     selectPickupTimeSlot(id: Int!): TimeSlot
 }

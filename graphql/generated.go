@@ -50,14 +50,30 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		SaveInformation      func(childComplexity int, information models.InformationInput) int
-		SelectPickupTimeSlot func(childComplexity int, id int) int
+		GenerateReservationSession func(childComplexity int) int
+		SaveInformation            func(childComplexity int, information models.InformationInput) int
+		SelectPickupTimeSlot       func(childComplexity int, id int) int
+		SetStorageItemQuantities   func(childComplexity int, quantities models.StorageItemQuantitiesInput) int
 	}
 
 	Query struct {
-		Me               func(childComplexity int) int
-		MyPickupTimeSlot func(childComplexity int) int
-		PickupTimeSlots  func(childComplexity int) int
+		Me                      func(childComplexity int) int
+		MyPickupTimeSlot        func(childComplexity int) int
+		MyStorageItemQuantities func(childComplexity int) int
+		PickupTimeSlots         func(childComplexity int) int
+		StorageItems            func(childComplexity int) int
+	}
+
+	StorageItem struct {
+		Description func(childComplexity int) int
+		ID          func(childComplexity int) int
+		Name        func(childComplexity int) int
+		Price       func(childComplexity int) int
+	}
+
+	StorageItemQuantity struct {
+		ItemID   func(childComplexity int) int
+		Quantity func(childComplexity int) int
 	}
 
 	TimeSlot struct {
@@ -72,10 +88,14 @@ type ComplexityRoot struct {
 
 type MutationResolver interface {
 	SaveInformation(ctx context.Context, information models.InformationInput) (*models.Me, error)
+	GenerateReservationSession(ctx context.Context) (string, error)
+	SetStorageItemQuantities(ctx context.Context, quantities models.StorageItemQuantitiesInput) ([]*models.StorageItemQuantity, error)
 	SelectPickupTimeSlot(ctx context.Context, id int) (*models.TimeSlot, error)
 }
 type QueryResolver interface {
 	Me(ctx context.Context) (*models.Me, error)
+	StorageItems(ctx context.Context) ([]*models.StorageItem, error)
+	MyStorageItemQuantities(ctx context.Context) ([]*models.StorageItemQuantity, error)
 	PickupTimeSlots(ctx context.Context) ([]*models.TimeSlot, error)
 	MyPickupTimeSlot(ctx context.Context) (*models.TimeSlot, error)
 }
@@ -116,6 +136,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Me.Stage(childComplexity), true
 
+	case "Mutation.generateReservationSession":
+		if e.complexity.Mutation.GenerateReservationSession == nil {
+			break
+		}
+
+		return e.complexity.Mutation.GenerateReservationSession(childComplexity), true
+
 	case "Mutation.saveInformation":
 		if e.complexity.Mutation.SaveInformation == nil {
 			break
@@ -140,6 +167,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.SelectPickupTimeSlot(childComplexity, args["id"].(int)), true
 
+	case "Mutation.setStorageItemQuantities":
+		if e.complexity.Mutation.SetStorageItemQuantities == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_setStorageItemQuantities_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.SetStorageItemQuantities(childComplexity, args["quantities"].(models.StorageItemQuantitiesInput)), true
+
 	case "Query.me":
 		if e.complexity.Query.Me == nil {
 			break
@@ -154,12 +193,68 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.MyPickupTimeSlot(childComplexity), true
 
+	case "Query.myStorageItemQuantities":
+		if e.complexity.Query.MyStorageItemQuantities == nil {
+			break
+		}
+
+		return e.complexity.Query.MyStorageItemQuantities(childComplexity), true
+
 	case "Query.pickupTimeSlots":
 		if e.complexity.Query.PickupTimeSlots == nil {
 			break
 		}
 
 		return e.complexity.Query.PickupTimeSlots(childComplexity), true
+
+	case "Query.storageItems":
+		if e.complexity.Query.StorageItems == nil {
+			break
+		}
+
+		return e.complexity.Query.StorageItems(childComplexity), true
+
+	case "StorageItem.description":
+		if e.complexity.StorageItem.Description == nil {
+			break
+		}
+
+		return e.complexity.StorageItem.Description(childComplexity), true
+
+	case "StorageItem.id":
+		if e.complexity.StorageItem.ID == nil {
+			break
+		}
+
+		return e.complexity.StorageItem.ID(childComplexity), true
+
+	case "StorageItem.name":
+		if e.complexity.StorageItem.Name == nil {
+			break
+		}
+
+		return e.complexity.StorageItem.Name(childComplexity), true
+
+	case "StorageItem.price":
+		if e.complexity.StorageItem.Price == nil {
+			break
+		}
+
+		return e.complexity.StorageItem.Price(childComplexity), true
+
+	case "StorageItemQuantity.itemID":
+		if e.complexity.StorageItemQuantity.ItemID == nil {
+			break
+		}
+
+		return e.complexity.StorageItemQuantity.ItemID(childComplexity), true
+
+	case "StorageItemQuantity.quantity":
+		if e.complexity.StorageItemQuantity.Quantity == nil {
+			break
+		}
+
+		return e.complexity.StorageItemQuantity.Quantity(childComplexity), true
 
 	case "TimeSlot.capacity":
 		if e.complexity.TimeSlot.Capacity == nil {
@@ -279,6 +374,27 @@ input InformationInput {
     onCampusFuture: Boolean!
 }
 
+input StorageItemQuantityInput {
+    itemID: Int!
+    quantity: Int!
+}
+
+input StorageItemQuantitiesInput {
+    quantities: [StorageItemQuantityInput!]!
+}
+
+type StorageItem {
+    id: Int!
+    name: String!
+    price: Int!
+    description: String!
+}
+
+type StorageItemQuantity {
+    itemID: Int!
+    quantity: Int!
+}
+
 type TimeSlot {
     id: Int!
     date: String!
@@ -290,12 +406,16 @@ type TimeSlot {
 
 type Query {
     me: Me!
+    storageItems: [StorageItem!]!
+    myStorageItemQuantities: [StorageItemQuantity!]!
     pickupTimeSlots: [TimeSlot!]!
     myPickupTimeSlot: TimeSlot
 }
 
 type Mutation {
     saveInformation(information: InformationInput!): Me!
+    generateReservationSession: String!
+    setStorageItemQuantities(quantities: StorageItemQuantitiesInput!): [StorageItemQuantity!]!
     selectPickupTimeSlot(id: Int!): TimeSlot
 }
 `},
@@ -330,6 +450,20 @@ func (ec *executionContext) field_Mutation_selectPickupTimeSlot_args(ctx context
 		}
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_setStorageItemQuantities_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 models.StorageItemQuantitiesInput
+	if tmp, ok := rawArgs["quantities"]; ok {
+		arg0, err = ec.unmarshalNStorageItemQuantitiesInput2githubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐStorageItemQuantitiesInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["quantities"] = arg0
 	return args, nil
 }
 
@@ -538,6 +672,87 @@ func (ec *executionContext) _Mutation_saveInformation(ctx context.Context, field
 	return ec.marshalNMe2ᚖgithubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐMe(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Mutation_generateReservationSession(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	ctx = ec.Tracer.StartFieldExecution(ctx, field)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+		ec.Tracer.EndFieldExecution(ctx)
+	}()
+	rctx := &graphql.ResolverContext{
+		Object:   "Mutation",
+		Field:    field,
+		Args:     nil,
+		IsMethod: true,
+	}
+	ctx = graphql.WithResolverContext(ctx, rctx)
+	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().GenerateReservationSession(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !ec.HasError(rctx) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	rctx.Result = res
+	ctx = ec.Tracer.StartFieldChildExecution(ctx)
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_setStorageItemQuantities(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	ctx = ec.Tracer.StartFieldExecution(ctx, field)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+		ec.Tracer.EndFieldExecution(ctx)
+	}()
+	rctx := &graphql.ResolverContext{
+		Object:   "Mutation",
+		Field:    field,
+		Args:     nil,
+		IsMethod: true,
+	}
+	ctx = graphql.WithResolverContext(ctx, rctx)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_setStorageItemQuantities_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	rctx.Args = args
+	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().SetStorageItemQuantities(rctx, args["quantities"].(models.StorageItemQuantitiesInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !ec.HasError(rctx) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*models.StorageItemQuantity)
+	rctx.Result = res
+	ctx = ec.Tracer.StartFieldChildExecution(ctx)
+	return ec.marshalNStorageItemQuantity2ᚕᚖgithubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐStorageItemQuantityᚄ(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Mutation_selectPickupTimeSlot(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	ctx = ec.Tracer.StartFieldExecution(ctx, field)
 	defer func() {
@@ -614,6 +829,80 @@ func (ec *executionContext) _Query_me(ctx context.Context, field graphql.Collect
 	rctx.Result = res
 	ctx = ec.Tracer.StartFieldChildExecution(ctx)
 	return ec.marshalNMe2ᚖgithubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐMe(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Query_storageItems(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	ctx = ec.Tracer.StartFieldExecution(ctx, field)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+		ec.Tracer.EndFieldExecution(ctx)
+	}()
+	rctx := &graphql.ResolverContext{
+		Object:   "Query",
+		Field:    field,
+		Args:     nil,
+		IsMethod: true,
+	}
+	ctx = graphql.WithResolverContext(ctx, rctx)
+	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().StorageItems(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !ec.HasError(rctx) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*models.StorageItem)
+	rctx.Result = res
+	ctx = ec.Tracer.StartFieldChildExecution(ctx)
+	return ec.marshalNStorageItem2ᚕᚖgithubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐStorageItemᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Query_myStorageItemQuantities(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	ctx = ec.Tracer.StartFieldExecution(ctx, field)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+		ec.Tracer.EndFieldExecution(ctx)
+	}()
+	rctx := &graphql.ResolverContext{
+		Object:   "Query",
+		Field:    field,
+		Args:     nil,
+		IsMethod: true,
+	}
+	ctx = graphql.WithResolverContext(ctx, rctx)
+	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().MyStorageItemQuantities(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !ec.HasError(rctx) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*models.StorageItemQuantity)
+	rctx.Result = res
+	ctx = ec.Tracer.StartFieldChildExecution(ctx)
+	return ec.marshalNStorageItemQuantity2ᚕᚖgithubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐStorageItemQuantityᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query_pickupTimeSlots(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -760,6 +1049,228 @@ func (ec *executionContext) _Query___schema(ctx context.Context, field graphql.C
 	rctx.Result = res
 	ctx = ec.Tracer.StartFieldChildExecution(ctx)
 	return ec.marshalO__Schema2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐSchema(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _StorageItem_id(ctx context.Context, field graphql.CollectedField, obj *models.StorageItem) (ret graphql.Marshaler) {
+	ctx = ec.Tracer.StartFieldExecution(ctx, field)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+		ec.Tracer.EndFieldExecution(ctx)
+	}()
+	rctx := &graphql.ResolverContext{
+		Object:   "StorageItem",
+		Field:    field,
+		Args:     nil,
+		IsMethod: false,
+	}
+	ctx = graphql.WithResolverContext(ctx, rctx)
+	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !ec.HasError(rctx) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	rctx.Result = res
+	ctx = ec.Tracer.StartFieldChildExecution(ctx)
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _StorageItem_name(ctx context.Context, field graphql.CollectedField, obj *models.StorageItem) (ret graphql.Marshaler) {
+	ctx = ec.Tracer.StartFieldExecution(ctx, field)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+		ec.Tracer.EndFieldExecution(ctx)
+	}()
+	rctx := &graphql.ResolverContext{
+		Object:   "StorageItem",
+		Field:    field,
+		Args:     nil,
+		IsMethod: false,
+	}
+	ctx = graphql.WithResolverContext(ctx, rctx)
+	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Name, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !ec.HasError(rctx) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	rctx.Result = res
+	ctx = ec.Tracer.StartFieldChildExecution(ctx)
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _StorageItem_price(ctx context.Context, field graphql.CollectedField, obj *models.StorageItem) (ret graphql.Marshaler) {
+	ctx = ec.Tracer.StartFieldExecution(ctx, field)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+		ec.Tracer.EndFieldExecution(ctx)
+	}()
+	rctx := &graphql.ResolverContext{
+		Object:   "StorageItem",
+		Field:    field,
+		Args:     nil,
+		IsMethod: false,
+	}
+	ctx = graphql.WithResolverContext(ctx, rctx)
+	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Price, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !ec.HasError(rctx) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	rctx.Result = res
+	ctx = ec.Tracer.StartFieldChildExecution(ctx)
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _StorageItem_description(ctx context.Context, field graphql.CollectedField, obj *models.StorageItem) (ret graphql.Marshaler) {
+	ctx = ec.Tracer.StartFieldExecution(ctx, field)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+		ec.Tracer.EndFieldExecution(ctx)
+	}()
+	rctx := &graphql.ResolverContext{
+		Object:   "StorageItem",
+		Field:    field,
+		Args:     nil,
+		IsMethod: false,
+	}
+	ctx = graphql.WithResolverContext(ctx, rctx)
+	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Description, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !ec.HasError(rctx) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	rctx.Result = res
+	ctx = ec.Tracer.StartFieldChildExecution(ctx)
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _StorageItemQuantity_itemID(ctx context.Context, field graphql.CollectedField, obj *models.StorageItemQuantity) (ret graphql.Marshaler) {
+	ctx = ec.Tracer.StartFieldExecution(ctx, field)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+		ec.Tracer.EndFieldExecution(ctx)
+	}()
+	rctx := &graphql.ResolverContext{
+		Object:   "StorageItemQuantity",
+		Field:    field,
+		Args:     nil,
+		IsMethod: false,
+	}
+	ctx = graphql.WithResolverContext(ctx, rctx)
+	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ItemID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !ec.HasError(rctx) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	rctx.Result = res
+	ctx = ec.Tracer.StartFieldChildExecution(ctx)
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _StorageItemQuantity_quantity(ctx context.Context, field graphql.CollectedField, obj *models.StorageItemQuantity) (ret graphql.Marshaler) {
+	ctx = ec.Tracer.StartFieldExecution(ctx, field)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+		ec.Tracer.EndFieldExecution(ctx)
+	}()
+	rctx := &graphql.ResolverContext{
+		Object:   "StorageItemQuantity",
+		Field:    field,
+		Args:     nil,
+		IsMethod: false,
+	}
+	ctx = graphql.WithResolverContext(ctx, rctx)
+	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Quantity, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !ec.HasError(rctx) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	rctx.Result = res
+	ctx = ec.Tracer.StartFieldChildExecution(ctx)
+	return ec.marshalNInt2int(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _TimeSlot_id(ctx context.Context, field graphql.CollectedField, obj *models.TimeSlot) (ret graphql.Marshaler) {
@@ -2177,6 +2688,48 @@ func (ec *executionContext) unmarshalInputInformationInput(ctx context.Context, 
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputStorageItemQuantitiesInput(ctx context.Context, obj interface{}) (models.StorageItemQuantitiesInput, error) {
+	var it models.StorageItemQuantitiesInput
+	var asMap = obj.(map[string]interface{})
+
+	for k, v := range asMap {
+		switch k {
+		case "quantities":
+			var err error
+			it.Quantities, err = ec.unmarshalNStorageItemQuantityInput2ᚕᚖgithubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐStorageItemQuantityInputᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputStorageItemQuantityInput(ctx context.Context, obj interface{}) (models.StorageItemQuantityInput, error) {
+	var it models.StorageItemQuantityInput
+	var asMap = obj.(map[string]interface{})
+
+	for k, v := range asMap {
+		switch k {
+		case "itemID":
+			var err error
+			it.ItemID, err = ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "quantity":
+			var err error
+			it.Quantity, err = ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 // endregion **************************** input.gotpl *****************************
 
 // region    ************************** interface.gotpl ***************************
@@ -2242,6 +2795,16 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "generateReservationSession":
+			out.Values[i] = ec._Mutation_generateReservationSession(ctx, field)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "setStorageItemQuantities":
+			out.Values[i] = ec._Mutation_setStorageItemQuantities(ctx, field)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		case "selectPickupTimeSlot":
 			out.Values[i] = ec._Mutation_selectPickupTimeSlot(ctx, field)
 		default:
@@ -2284,6 +2847,34 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				}
 				return res
 			})
+		case "storageItems":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_storageItems(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
+		case "myStorageItemQuantities":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_myStorageItemQuantities(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
 		case "pickupTimeSlots":
 			field := field
 			out.Concurrently(i, func() (res graphql.Marshaler) {
@@ -2313,6 +2904,80 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Values[i] = ec._Query___type(ctx, field)
 		case "__schema":
 			out.Values[i] = ec._Query___schema(ctx, field)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var storageItemImplementors = []string{"StorageItem"}
+
+func (ec *executionContext) _StorageItem(ctx context.Context, sel ast.SelectionSet, obj *models.StorageItem) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.RequestContext, sel, storageItemImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("StorageItem")
+		case "id":
+			out.Values[i] = ec._StorageItem_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "name":
+			out.Values[i] = ec._StorageItem_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "price":
+			out.Values[i] = ec._StorageItem_price(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "description":
+			out.Values[i] = ec._StorageItem_description(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var storageItemQuantityImplementors = []string{"StorageItemQuantity"}
+
+func (ec *executionContext) _StorageItemQuantity(ctx context.Context, sel ast.SelectionSet, obj *models.StorageItemQuantity) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.RequestContext, sel, storageItemQuantityImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("StorageItemQuantity")
+		case "itemID":
+			out.Values[i] = ec._StorageItemQuantity_itemID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "quantity":
+			out.Values[i] = ec._StorageItemQuantity_quantity(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -2665,6 +3330,144 @@ func (ec *executionContext) marshalNMe2ᚖgithubᚗcomᚋandrewmthomas87ᚋlitte
 		return graphql.Null
 	}
 	return ec._Me(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNStorageItem2githubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐStorageItem(ctx context.Context, sel ast.SelectionSet, v models.StorageItem) graphql.Marshaler {
+	return ec._StorageItem(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNStorageItem2ᚕᚖgithubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐStorageItemᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.StorageItem) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		rctx := &graphql.ResolverContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithResolverContext(ctx, rctx)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNStorageItem2ᚖgithubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐStorageItem(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+	return ret
+}
+
+func (ec *executionContext) marshalNStorageItem2ᚖgithubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐStorageItem(ctx context.Context, sel ast.SelectionSet, v *models.StorageItem) graphql.Marshaler {
+	if v == nil {
+		if !ec.HasError(graphql.GetResolverContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	return ec._StorageItem(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNStorageItemQuantitiesInput2githubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐStorageItemQuantitiesInput(ctx context.Context, v interface{}) (models.StorageItemQuantitiesInput, error) {
+	return ec.unmarshalInputStorageItemQuantitiesInput(ctx, v)
+}
+
+func (ec *executionContext) marshalNStorageItemQuantity2githubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐStorageItemQuantity(ctx context.Context, sel ast.SelectionSet, v models.StorageItemQuantity) graphql.Marshaler {
+	return ec._StorageItemQuantity(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNStorageItemQuantity2ᚕᚖgithubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐStorageItemQuantityᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.StorageItemQuantity) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		rctx := &graphql.ResolverContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithResolverContext(ctx, rctx)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNStorageItemQuantity2ᚖgithubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐStorageItemQuantity(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+	return ret
+}
+
+func (ec *executionContext) marshalNStorageItemQuantity2ᚖgithubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐStorageItemQuantity(ctx context.Context, sel ast.SelectionSet, v *models.StorageItemQuantity) graphql.Marshaler {
+	if v == nil {
+		if !ec.HasError(graphql.GetResolverContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	return ec._StorageItemQuantity(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNStorageItemQuantityInput2githubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐStorageItemQuantityInput(ctx context.Context, v interface{}) (models.StorageItemQuantityInput, error) {
+	return ec.unmarshalInputStorageItemQuantityInput(ctx, v)
+}
+
+func (ec *executionContext) unmarshalNStorageItemQuantityInput2ᚕᚖgithubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐStorageItemQuantityInputᚄ(ctx context.Context, v interface{}) ([]*models.StorageItemQuantityInput, error) {
+	var vSlice []interface{}
+	if v != nil {
+		if tmp1, ok := v.([]interface{}); ok {
+			vSlice = tmp1
+		} else {
+			vSlice = []interface{}{v}
+		}
+	}
+	var err error
+	res := make([]*models.StorageItemQuantityInput, len(vSlice))
+	for i := range vSlice {
+		res[i], err = ec.unmarshalNStorageItemQuantityInput2ᚖgithubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐStorageItemQuantityInput(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) unmarshalNStorageItemQuantityInput2ᚖgithubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐStorageItemQuantityInput(ctx context.Context, v interface{}) (*models.StorageItemQuantityInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalNStorageItemQuantityInput2githubᚗcomᚋandrewmthomas87ᚋlitterboxᚋgraphqlᚋmodelsᚐStorageItemQuantityInput(ctx, v)
+	return &res, err
 }
 
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v interface{}) (string, error) {

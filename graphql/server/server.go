@@ -12,6 +12,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/mediocregopher/radix/v3"
 	"github.com/spf13/viper"
+	"github.com/stripe/stripe-go"
 	"log"
 	"net/http"
 	"time"
@@ -92,6 +93,8 @@ func main() {
 		viper.GetInt("redis.poolSize"))
 
 	store := auth.NewStore(db, pool)
+
+	stripe.Key = viper.GetString("stripe.key")
 
 	r := gin.Default()
 	g := r.Group("/graphql")

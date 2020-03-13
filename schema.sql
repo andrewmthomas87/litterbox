@@ -17,6 +17,23 @@ CREATE TABLE users
     PRIMARY KEY (id)
 );
 
+CREATE TABLE storageItems
+(
+    id          INT AUTO_INCREMENT,
+    name        VARCHAR(250),
+    price       INT,
+    description VARCHAR(10000),
+
+    PRIMARY KEY (id)
+);
+
+CREATE TABLE storageItemQuantities
+(
+    userID   VARCHAR(250),
+    itemID   INT,
+    quantity INT
+);
+
 CREATE TABLE pickupTimeSlots
 (
     id        INT AUTO_INCREMENT,
